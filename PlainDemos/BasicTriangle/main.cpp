@@ -59,16 +59,17 @@ private:
         appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.pEngineName = "No Engine";
         appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-        appInfo.apiVersion = VK_API_VERSION_1_3;
+        appInfo.apiVersion = VK_API_VERSION_1_0;
 
-        uint32_t glfwExtensionCount = 0;
-        const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+        //uint32_t glfwExtensionCount = 0;
+        //const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+        std::vector<const char*> requiredExtensions = getRequiredExtensions();
 
         VkInstanceCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
         createInfo.pApplicationInfo = &appInfo;
-        createInfo.enabledExtensionCount = glfwExtensionCount;
-        createInfo.ppEnabledExtensionNames = glfwExtensions;
+        createInfo.enabledExtensionCount = static_cast<uint32_t>(requiredExtensions.size());
+        createInfo.ppEnabledExtensionNames = requiredExtensions.data();
         if (enableValidationLayers)
         {
             createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
@@ -91,12 +92,17 @@ private:
         vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
         std::vector<VkLayerProperties> availableLayerProperties(layerCount);
         vkEnumerateInstanceLayerProperties(&layerCount, availableLayerProperties.data());
+        std::cout << "available instance layers:\n";
+        for (const VkLayerProperties& layerProperty : availableLayerProperties)
+        {
+            std::cout << layerProperty.layerName << std::endl;
+        }
         for (const char* layerName : validationLayers)
         {
             bool layerFound = false;
             for (const VkLayerProperties& layerProperty : availableLayerProperties)
             {
-                if (strcmp(layerProperty.layerName, layerName))
+                if (!strcmp(layerProperty.layerName, layerName))
                 {
                     layerFound = true;
                     break;
@@ -108,6 +114,18 @@ private:
             }
         }
         return true;
+    }
+
+    std::vector<const char *> getRequiredExtensions()
+    {
+        uint32_t glfwExtensionCount = 0;
+        const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+        std::vector<const char *> requiredExtensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+        if (enableValidationLayers)
+        {
+            requiredExtensions.emplace_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+        }
+        return requiredExtensions;
     }
 
     void mainLoop()
