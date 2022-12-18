@@ -16,7 +16,27 @@ const bool enableValidationLayers = false;
 const bool enableValidationLayers = true;
 #endif
 
+VkResult CreateDebugUtilsMessengerExt(VkInstance instance, VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pMessenger)
+{
+    PFN_vkCreateDebugUtilsMessengerEXT func = (PFN_vkCreateDebugUtilsMessengerEXT)(vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT"));
+    if (func)
+    {
+       return func(instance, pCreateInfo, pAllocator, pMessenger);
+    }
+    else
+    {
+        return VK_ERROR_EXTENSION_NOT_PRESENT;
+    }
+}
 
+void DestroyDebugUtilsMessengerExt(VkInstance instance, VkDebugUtilsMessengerEXT pMessenger, const VkAllocationCallbacks* pAllocator)
+{
+    PFN_vkDestroyDebugUtilsMessengerEXT func = (PFN_vkDestroyDebugUtilsMessengerEXT)(vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT"));
+    if (func)
+    {
+        func(instance, pMessenger, pAllocator);
+    }
+}
 
 class HelloTriangleApplication {
 public:
@@ -30,6 +50,7 @@ public:
 private:
 GLFWwindow* window = nullptr;
 VkInstance instance;
+VkDebugUtilsMessengerEXT debugMessenger;
 
 
 private:
@@ -44,6 +65,7 @@ private:
     void initVulkan()
     {
         createInstance();
+        setupDebugUtilsMessenger();
     }
 
     void createInstance()
@@ -84,6 +106,24 @@ private:
             throw std::runtime_error("failed to create instance");
         }
         checkSupportedExtensions();
+    }
+
+    void setupDebugUtilsMessenger()
+    {
+        if (!enableValidationLayers)
+        {
+            return;
+        }
+        VkDebugUtilsMessengerCreateInfoEXT createInfo{};
+        createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+        createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+        createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+        createInfo.pfnUserCallback = debugCallBack;
+        createInfo.pUserData = nullptr;
+        if (CreateDebugUtilsMessengerExt(instance, &createInfo, nullptr, &debugMessenger) != VK_SUCCESS)
+        {
+            throw std::runtime_error("failed to set up debug messenger!");
+        }
     }
 
     bool checkValidationLayerSupport()
@@ -128,6 +168,13 @@ private:
         return requiredExtensions;
     }
 
+    static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallBack(VkDebugUtilsMessageSeverityFlagBitsEXT severity, 
+        VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT *pCallback, void *pUserData)
+    {
+        std::cerr << "validation layer: " << pCallback->pMessage << std::endl;
+        return VK_FALSE; // whether the Vulkan call that triggered the validation layer message should be aborted
+    }
+
     void mainLoop()
     {
         while (!glfwWindowShouldClose(window))
@@ -138,7 +185,12 @@ private:
 
     void cleanup()
     {
+        if (enableValidationLayers)
+        {
+            DestroyDebugUtilsMessengerExt(instance, debugMessenger, nullptr);
+        }
         vkDestroyInstance(instance, nullptr);
+
         glfwDestroyWindow(window);
         glfwTerminate();
     }
