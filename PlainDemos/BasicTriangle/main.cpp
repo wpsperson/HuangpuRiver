@@ -81,6 +81,10 @@ VkQueue graphicsQueue;
 VkQueue presentQueue;
 VkSurfaceKHR surface;
 VkSwapchainKHR swapChain;
+std::vector<VkImage> swapChainImages;
+VkFormat swapChainFormat;
+VkExtent2D swapChainExtent;
+
 
 private:
     void initWindow()
@@ -276,7 +280,7 @@ private:
     {
         SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice);
 
-        VkSurfaceFormatKHR format = chooseSwapSurfaceFormat(swapChainSupport.formats);
+        VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
         VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
         VkExtent2D extent = chooseSwapChainExtend(swapChainSupport.capabilities);
         uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
@@ -290,8 +294,8 @@ private:
         swapChainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
         swapChainCreateInfo.surface = surface;
         swapChainCreateInfo.minImageCount = imageCount;
-        swapChainCreateInfo.imageFormat = format.format;
-        swapChainCreateInfo.imageColorSpace = format.colorSpace;
+        swapChainCreateInfo.imageFormat = surfaceFormat.format;
+        swapChainCreateInfo.imageColorSpace = surfaceFormat.colorSpace;
         swapChainCreateInfo.imageExtent = extent;
         swapChainCreateInfo.imageArrayLayers = 1;
         swapChainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
@@ -320,6 +324,13 @@ private:
             throw std::runtime_error("failed to create swapchain!");
         }
 
+        // get swap chain images
+        uint32_t swapChainImageCount;
+        vkGetSwapchainImagesKHR(device, swapChain, &swapChainImageCount, nullptr);
+        swapChainImages.resize(swapChainImageCount);
+        vkGetSwapchainImagesKHR(device, swapChain, &swapChainImageCount, swapChainImages.data());
+        swapChainFormat = surfaceFormat.format;
+        swapChainExtent = extent;
     }
 
     bool isDeviceSuitable(VkPhysicalDevice device)
@@ -428,7 +439,7 @@ private:
     {
         for (const VkSurfaceFormatKHR format : formats)
         {
-            if (format.format == VK_FORMAT_R8G8B8A8_SRGB && format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+            if (format.format == VK_FORMAT_B8G8R8A8_SRGB && format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
             {
                 return format;
             }
