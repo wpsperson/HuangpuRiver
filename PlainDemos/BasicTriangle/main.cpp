@@ -44,10 +44,11 @@ void DestroyDebugUtilsMessengerExt(VkInstance instance, VkDebugUtilsMessengerEXT
 struct QueueFamilyIndices
 {
     std::optional<uint32_t> graphicsFamily;
+    std::optional<uint32_t> presentFamily;
 
     bool isComplete()
     {
-        return graphicsFamily.has_value();
+        return graphicsFamily.has_value() && presentFamily.has_value();
     }
 
 };
@@ -67,6 +68,7 @@ VkDebugUtilsMessengerEXT debugMessenger;
 VkPhysicalDevice physicalDevice = VK_NULL_HANDLE; // implitly destroyed when instace destroyed
 VkDevice device = VK_NULL_HANDLE;
 VkQueue graphicsQueue;
+VkSurfaceKHR surface;
 
 private:
     void initWindow()
@@ -81,6 +83,7 @@ private:
     {
         createInstance();
         setupDebugUtilsMessenger();
+        createSurface();
         pickPhysicalDevice();
         createLogicalDevice();
     }
@@ -101,6 +104,7 @@ private:
         {
             DestroyDebugUtilsMessengerExt(instance, debugMessenger, nullptr);
         }
+        vkDestroySurfaceKHR(instance, surface, nullptr);
         vkDestroyInstance(instance, nullptr);
 
         glfwDestroyWindow(window);
@@ -248,9 +252,16 @@ private:
         vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyPropertiesCount, queueFamilies.data());
 
         int i = 0;
-        for (const auto& queueFamily : queueFamilies) {
+        for (const auto& queueFamily : queueFamilies)
+        {
             if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
                 indices.graphicsFamily = i;
+            }
+            VkBool32 presentSupport = false;
+            vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
+            if (presentSupport)
+            {
+                indices.presentFamily = i;
             }
 
             if (indices.isComplete()) {
@@ -325,6 +336,13 @@ private:
         }
     }
 
+    void createSurface()
+    {
+        if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS)
+        {
+            throw std::runtime_error("failed to create window surface!");
+        }
+    }
 
 };
 
