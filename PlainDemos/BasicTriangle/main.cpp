@@ -1,6 +1,7 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+#include <algorithm>
 #include <iostream>
 #include <optional>
 #include <set>
@@ -351,6 +352,47 @@ private:
         details.presentModes.resize(presentModeCount);
         vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, details.presentModes.data());
         return details;
+    }
+
+    VkExtent2D chooseSwapChainExtend(const VkSurfaceCapabilitiesKHR& capabilities)
+    {
+        if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
+        {
+            return capabilities.currentExtent;
+        }
+        else
+        {
+            int width, height;
+            glfwGetFramebufferSize(window, &width, &height);
+            VkExtent2D actualExtent = { static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
+            actualExtent.width = std::clamp(actualExtent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.height);
+            actualExtent.height = std::clamp(actualExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
+            return actualExtent;
+        }
+    }
+
+    VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& formats)
+    {
+        for (const VkSurfaceFormatKHR format : formats)
+        {
+            if (format.format == VK_FORMAT_R8G8B8A8_SRGB && format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+            {
+                return format;
+            }
+        }
+        return formats[0];
+    }
+
+    VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& presentModes)
+    {
+        for (VkPresentModeKHR present : presentModes)
+        {
+            if (present == VkPresentModeKHR::VK_PRESENT_MODE_MAILBOX_KHR)
+            {
+                return present;
+            }
+        }
+        return VK_PRESENT_MODE_FIFO_KHR;
     }
 
     std::vector<const char*> getRequiredExtensions()
