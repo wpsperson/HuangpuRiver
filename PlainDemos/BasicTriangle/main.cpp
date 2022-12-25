@@ -68,6 +68,7 @@ VkDebugUtilsMessengerEXT debugMessenger;
 VkPhysicalDevice physicalDevice = VK_NULL_HANDLE; // implitly destroyed when instace destroyed
 VkDevice device = VK_NULL_HANDLE;
 VkQueue graphicsQueue;
+VkQueue presentQueue;
 VkSurfaceKHR surface;
 
 private:
@@ -159,7 +160,7 @@ private:
     void populateDebugUtilsMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo)
     {
         createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-        createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+        createInfo.messageSeverity = /*VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |*/ VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
         createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
         createInfo.pfnUserCallback = debugCallBack;
         createInfo.pUserData = nullptr;
@@ -176,6 +177,14 @@ private:
         if (CreateDebugUtilsMessengerExt(instance, &createInfo, nullptr, &debugMessenger) != VK_SUCCESS)
         {
             throw std::runtime_error("failed to set up debug messenger!");
+        }
+    }
+
+    void createSurface()
+    {
+        if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS)
+        {
+            throw std::runtime_error("failed to create window surface!");
         }
     }
 
@@ -202,18 +211,33 @@ private:
     void createLogicalDevice()
     {
         QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
-        VkDeviceQueueCreateInfo queueCreateInfo{};
-        queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-        queueCreateInfo.queueCount = 1;
-        queueCreateInfo.queueFamilyIndex = indices.graphicsFamily.value();
+        //VkDeviceQueueCreateInfo queueCreateInfo{};
+        //queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        //queueCreateInfo.queueCount = 1;
+        //queueCreateInfo.queueFamilyIndex = indices.graphicsFamily.value();
+        //const float queuePriority = 1.0f;
+        //queueCreateInfo.pQueuePriorities = &queuePriority;
+        std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+        std::vector<uint32_t> queueFamiliyIndices = { indices.graphicsFamily.value(), indices.presentFamily.value() };
+
         const float queuePriority = 1.0f;
-        queueCreateInfo.pQueuePriorities = &queuePriority;
+        for (uint32_t queueFamilyIndex : queueFamiliyIndices)
+        {
+            VkDeviceQueueCreateInfo queueCreateInfo{};
+            queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+            queueCreateInfo.queueFamilyIndex = queueFamilyIndex;
+            queueCreateInfo.queueCount = 1; // in each queue family, we only create one queue.
+            queueCreateInfo.pQueuePriorities = &queuePriority;
+            queueCreateInfos.emplace_back(queueCreateInfo);
+        }
 
         VkPhysicalDeviceFeatures deviceFeatures{};
         VkDeviceCreateInfo deviceCreateInfo{};
         deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-        deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
-        deviceCreateInfo.queueCreateInfoCount = 1;
+        //deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
+        //deviceCreateInfo.queueCreateInfoCount = 1;
+        deviceCreateInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
+        deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
         deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
         deviceCreateInfo.enabledExtensionCount = 0;
         if (enableValidationLayers)
@@ -229,7 +253,9 @@ private:
         {
             throw std::runtime_error("failed to create logical device!");
         }
+        // the third parameter mean in current queue family, which queue we want to get. this index relats to VkDeviceQueueCreateInfo::queueCount
         vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
+        vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
     }
 
     bool isDeviceSuitable(VkPhysicalDevice device)
@@ -333,14 +359,6 @@ private:
         for (const VkExtensionProperties& extension : extensionProperties)
         {
             std::cout << extension.extensionName << std::endl;
-        }
-    }
-
-    void createSurface()
-    {
-        if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS)
-        {
-            throw std::runtime_error("failed to create window surface!");
         }
     }
 
