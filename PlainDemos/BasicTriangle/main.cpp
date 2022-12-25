@@ -2,6 +2,7 @@
 #include <GLFW/glfw3.h>
 
 #include <iostream>
+#include <optional>
 #include <stdexcept>
 #include <cstdlib>
 #include <vector>
@@ -15,6 +16,8 @@ const bool enableValidationLayers = false;
 #else
 const bool enableValidationLayers = true;
 #endif
+
+
 
 VkResult CreateDebugUtilsMessengerExt(VkInstance instance, VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pMessenger)
 {
@@ -38,6 +41,16 @@ void DestroyDebugUtilsMessengerExt(VkInstance instance, VkDebugUtilsMessengerEXT
     }
 }
 
+struct QueueFamilyIndices
+{
+    std::optional<uint32_t> graphicsFamily;
+
+    bool isComplete()
+    {
+        return graphicsFamily.has_value();
+    }
+
+};
 class HelloTriangleApplication {
 public:
     void run()
@@ -51,7 +64,7 @@ private:
 GLFWwindow* window = nullptr;
 VkInstance instance;
 VkDebugUtilsMessengerEXT debugMessenger;
-
+VkPhysicalDevice physicalDevice = VK_NULL_HANDLE; // implitly destroyed when instace destroyed
 
 private:
     void initWindow()
@@ -59,13 +72,14 @@ private:
         glfwInit();
         // default GLFW_CLIENT_API is OPENGL context
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-        window = glfwCreateWindow(800, 600, "Vulkan window", nullptr, nullptr);
+        window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan window", nullptr, nullptr);
     }
 
     void initVulkan()
     {
         createInstance();
         setupDebugUtilsMessenger();
+        pickPhysicalDevice();
     }
 
     void mainLoop()
@@ -156,6 +170,61 @@ private:
         }
     }
 
+    void pickPhysicalDevice()
+    {
+        uint32_t device_count;
+        vkEnumeratePhysicalDevices(instance, &device_count, nullptr);
+        std::vector<VkPhysicalDevice> physicalDevices(device_count);
+        vkEnumeratePhysicalDevices(instance, &device_count, physicalDevices.data());
+        for (VkPhysicalDevice device : physicalDevices)
+        {
+            if (isDeviceSuitable(device))
+            {
+                physicalDevice = device;
+                break;
+            }
+        }
+        if (physicalDevice == VK_NULL_HANDLE)
+        {
+            throw std::runtime_error("failed to find a suitable GPU!");
+        }
+    }
+
+    bool isDeviceSuitable(VkPhysicalDevice device)
+    {
+        VkPhysicalDeviceFeatures deviceFeatures;
+        VkPhysicalDeviceProperties deviceProperties;
+        vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
+        vkGetPhysicalDeviceProperties(device, &deviceProperties);
+
+        QueueFamilyIndices indice = findQueueFamilies(device);
+        return indice.isComplete();
+    }
+
+    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device)
+    {
+        QueueFamilyIndices indices;
+        uint32_t queueFamilyPropertiesCount;
+        vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyPropertiesCount, nullptr);
+        std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyPropertiesCount);
+        vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyPropertiesCount, queueFamilies.data());
+
+        int i = 0;
+        for (const auto& queueFamily : queueFamilies) {
+            if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+                indices.graphicsFamily = i;
+            }
+
+            if (indices.isComplete()) {
+                break;
+            }
+
+            i++;
+        }
+
+        return indices;
+    }
+
     std::vector<const char*> getRequiredExtensions()
     {
         uint32_t glfwExtensionCount = 0;
@@ -217,6 +286,8 @@ private:
             std::cout << extension.extensionName << std::endl;
         }
     }
+
+
 };
 
 int main() {
