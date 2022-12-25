@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <optional>
+#include <set>
 #include <stdexcept>
 #include <cstdlib>
 #include <vector>
@@ -11,6 +12,7 @@ const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
 
 const std::vector<const char*> validationLayers = { "VK_LAYER_KHRONOS_validation" };
+const std::vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 #ifdef NDEBUG
 const bool enableValidationLayers = false;
 #else
@@ -239,7 +241,8 @@ private:
         deviceCreateInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
         deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
         deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
-        deviceCreateInfo.enabledExtensionCount = 0;
+        deviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
+        deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.data();
         if (enableValidationLayers)
         {
             deviceCreateInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
@@ -266,7 +269,8 @@ private:
         vkGetPhysicalDeviceProperties(device, &deviceProperties);
 
         QueueFamilyIndices indice = findQueueFamilies(device);
-        return indice.isComplete();
+        bool extensionsSupported = checkDeviceExtensionSupport(device);
+        return indice.isComplete() && extensionsSupported;
     }
 
     QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device)
@@ -298,6 +302,25 @@ private:
         }
 
         return indices;
+    }
+
+    bool checkDeviceExtensionSupport(VkPhysicalDevice device)
+    {
+        uint32_t extensionCount;
+        vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
+        if (extensionCount <= 0)
+        {
+            return false;
+        }
+        std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+        vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
+
+        std::set<std::string> requiredDeviceExtensions(deviceExtensions.begin(), deviceExtensions.end());
+        for (const VkExtensionProperties& extensionProp : availableExtensions)
+        {
+            requiredDeviceExtensions.erase(extensionProp.extensionName);
+        }
+        return requiredDeviceExtensions.empty();
     }
 
     std::vector<const char*> getRequiredExtensions()
