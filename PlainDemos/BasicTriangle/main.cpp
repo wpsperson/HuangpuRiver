@@ -89,6 +89,7 @@ std::vector<VkImageView> swapChainImageViews;
 VkRenderPass renderPass;
 VkPipelineLayout pipelineLayout;
 VkPipeline graphicsPipeline;
+std::vector<VkFramebuffer> swapChainFramebuffers;
 
 private:
     void initWindow()
@@ -110,6 +111,7 @@ private:
         createImageViews();
         createRenderPass();
         createPipeline();
+        createFrameBuffers();
     }
 
     void mainLoop()
@@ -122,6 +124,10 @@ private:
 
     void cleanup()
     {
+        for (VkFramebuffer framebuffer : swapChainFramebuffers)
+        {
+            vkDestroyFramebuffer(device, framebuffer, nullptr);
+        }
         vkDestroyPipeline(device, graphicsPipeline, nullptr);
         vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
         vkDestroyRenderPass(device, renderPass, nullptr);
@@ -393,7 +399,7 @@ private:
         VkSubpassDescription subpass{};
         subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
         subpass.colorAttachmentCount = 1;
-        subpass.pColorAttachments = &colorAttachmentRef;// index of this array relate with layout(location=0) in fragment shader.
+        subpass.pColorAttachments = &colorAttachmentRef;// index of this array relate with "layout(location=0) out vec4 outColor" in fragment shader.
         VkRenderPassCreateInfo renderPassInfo{};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
         renderPassInfo.attachmentCount = 1;
@@ -441,8 +447,8 @@ private:
         VkViewport viewport{};
         viewport.x = 0;
         viewport.y = 0;
-        viewport.width = swapChainExtent.width;
-        viewport.height = swapChainExtent.height;
+        viewport.width = static_cast<float>(swapChainExtent.width);
+        viewport.height = static_cast<float>(swapChainExtent.height);
         viewport.minDepth = 1.0f;
         viewport.maxDepth = 1.0f;
 
@@ -539,6 +545,27 @@ private:
 
         vkDestroyShaderModule(device, vertShaderModule, nullptr);
         vkDestroyShaderModule(device, fragShaderModule, nullptr);
+    }
+
+    void createFrameBuffers()
+    {
+        swapChainFramebuffers.resize(swapChainImageViews.size());
+        for (std::size_t i = 0; i < swapChainImageViews.size(); i++)
+        {
+            VkImageView attachments[] = { swapChainImageViews[i] };
+            VkFramebufferCreateInfo framebufferInfo{};
+            framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+            framebufferInfo.renderPass = renderPass;
+            framebufferInfo.attachmentCount = 1;
+            framebufferInfo.pAttachments = attachments;
+            framebufferInfo.width = swapChainExtent.width;
+            framebufferInfo.height = swapChainExtent.height;
+            framebufferInfo.layers = 1;
+            if (vkCreateFramebuffer(device, &framebufferInfo, nullptr, &swapChainFramebuffers[i]) != VK_SUCCESS)
+            {
+                throw std::runtime_error("failed to create frame buffer!");
+            }
+        }
     }
 
     VkShaderModule createShaderModule(const std::vector<char>& code)
