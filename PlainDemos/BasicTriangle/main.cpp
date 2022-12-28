@@ -599,6 +599,55 @@ private:
         }
     }
 
+    void recordCommandBuffer(VkCommandBuffer cmdBuffer, uint32_t imageIndex)
+    {
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = 0; // Optional
+        beginInfo.pInheritanceInfo = nullptr; // Optional
+        if (vkBeginCommandBuffer(cmdBuffer, &beginInfo) != VK_SUCCESS)
+        {
+            throw std::runtime_error("failed to begin command buffer!");
+        }
+
+        VkRenderPassBeginInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass = renderPass;
+        renderPassInfo.framebuffer = swapChainFramebuffers[imageIndex];
+        renderPassInfo.renderArea.offset = { 0,0 };
+        renderPassInfo.renderArea.extent = swapChainExtent; // where shader loads and stores take place.
+        VkClearValue clearColor = { {{0.0f,0.0f,0.0f,1.0f }} };
+        renderPassInfo.clearValueCount = 1;
+        renderPassInfo.pClearValues = &clearColor;
+        vkCmdBeginRenderPass(cmdBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+        vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+
+        VkViewport viewport{};
+        viewport.x = 0;
+        viewport.y = 0;
+        viewport.width = static_cast<float>(swapChainExtent.width);
+        viewport.height = static_cast<float>(swapChainExtent.height);
+        viewport.minDepth = 1.0f;
+        viewport.maxDepth = 1.0f;
+        vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
+
+        VkRect2D scissor{};
+        scissor.offset = { 0,0 };
+        scissor.extent = swapChainExtent;
+        vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
+
+        uint32_t vertexCount = 3;
+        uint32_t instanceCount = 1;
+        uint32_t firstVertex = 0;
+        uint32_t firstInstance = 0;
+        vkCmdDraw(cmdBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
+        vkCmdEndRenderPass(cmdBuffer);
+        if (vkEndCommandBuffer(cmdBuffer) != VK_SUCCESS)
+        {
+            throw std::runtime_error("failed to record command buffer!");
+        }
+    }
+
     VkShaderModule createShaderModule(const std::vector<char>& code)
     {
         VkShaderModuleCreateInfo createInfo{};
