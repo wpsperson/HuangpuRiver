@@ -90,6 +90,8 @@ VkRenderPass renderPass;
 VkPipelineLayout pipelineLayout;
 VkPipeline graphicsPipeline;
 std::vector<VkFramebuffer> swapChainFramebuffers;
+VkCommandPool commandPool;
+VkCommandBuffer commandBuffer;
 
 private:
     void initWindow()
@@ -112,6 +114,7 @@ private:
         createRenderPass();
         createPipeline();
         createFrameBuffers();
+        createCommandPool();
     }
 
     void mainLoop()
@@ -124,6 +127,7 @@ private:
 
     void cleanup()
     {
+        vkDestroyCommandPool(device, commandPool, nullptr);
         for (VkFramebuffer framebuffer : swapChainFramebuffers)
         {
             vkDestroyFramebuffer(device, framebuffer, nullptr);
@@ -565,6 +569,19 @@ private:
             {
                 throw std::runtime_error("failed to create frame buffer!");
             }
+        }
+    }
+
+    void createCommandPool()
+    {
+        QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+        VkCommandPoolCreateInfo poolInfo{};
+        poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+        poolInfo.queueFamilyIndex = indices.graphicsFamily.value();
+        if (vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool) != VK_SUCCESS)
+        {
+            throw std::runtime_error("failed to create command pool!");
         }
     }
 
