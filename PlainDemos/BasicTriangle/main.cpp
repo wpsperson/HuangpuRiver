@@ -271,7 +271,8 @@ private:
         //const float queuePriority = 1.0f;
         //queueCreateInfo.pQueuePriorities = &queuePriority;
         std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-        std::vector<uint32_t> queueFamiliyIndices = { indices.graphicsFamily.value(), indices.presentFamily.value() };
+        // use set to void repeat queue family indices.
+        std::set<uint32_t> queueFamiliyIndices = { indices.graphicsFamily.value(), indices.presentFamily.value() };
 
         const float queuePriority = 1.0f;
         for (uint32_t queueFamilyIndex : queueFamiliyIndices)
