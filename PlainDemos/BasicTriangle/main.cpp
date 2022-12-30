@@ -97,6 +97,7 @@ std::vector<VkSemaphore> imageAvailableSemaphores;
 std::vector<VkSemaphore> renderFinishSemaphores;
 std::vector<VkFence> inFlightFences;
 uint32_t currentFrame = 0;
+bool frameBufferResized = false;
 
 private:
     void initWindow()
@@ -105,6 +106,14 @@ private:
         // default GLFW_CLIENT_API is OPENGL context
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan window", nullptr, nullptr);
+        glfwSetWindowUserPointer(window, this);
+        glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
+    }
+
+    static void framebufferResizeCallback(GLFWwindow* window, int width, int height)
+    {
+        HelloTriangleApplication* self = reinterpret_cast<HelloTriangleApplication*>(glfwGetWindowUserPointer(window));
+        self->frameBufferResized = true;
     }
 
     void initVulkan()
@@ -742,8 +751,9 @@ private:
         presentInfo.pImageIndices = &imageIndex;
         presentInfo.pResults = nullptr; // Optional
         result = vkQueuePresentKHR(graphicsQueue, &presentInfo);
-        if (VK_ERROR_OUT_OF_DATE_KHR == result || VK_SUBOPTIMAL_KHR == result)
+        if (VK_ERROR_OUT_OF_DATE_KHR == result || VK_SUBOPTIMAL_KHR == result || frameBufferResized)
         {
+            frameBufferResized = false;
             recreateSwapChain();
         }
         else if (VK_SUCCESS != result)
@@ -756,6 +766,15 @@ private:
 
     void recreateSwapChain()
     {
+        int width, height;
+        glfwGetFramebufferSize(window, &width, &height);
+        while (width == 0 && height == 0)
+        {
+            glfwGetFramebufferSize(window, &width, &height);
+            glfwWaitEvents();
+            std::cout << "wait when minimization" << std::endl;
+        }
+
         vkDeviceWaitIdle(device);
 
         cleanupSwapChain();
