@@ -12,6 +12,7 @@
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
+const int MAX_FRAMES_IN_FLIGHT = 2;
 
 const std::vector<const char*> validationLayers = { "VK_LAYER_KHRONOS_validation" };
 const std::vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
@@ -91,10 +92,11 @@ VkPipelineLayout pipelineLayout;
 VkPipeline graphicsPipeline;
 std::vector<VkFramebuffer> swapChainFramebuffers;
 VkCommandPool commandPool;
-VkCommandBuffer commandBuffer;
-VkSemaphore imageAvailableSemaphore;
-VkSemaphore renderFinishSemaphore;
-VkFence inFlightFence;
+std::vector<VkCommandBuffer> commandBuffers;
+std::vector<VkSemaphore> imageAvailableSemaphores;
+std::vector<VkSemaphore> renderFinishSemaphores;
+std::vector<VkFence> inFlightFences;
+uint32_t currentFrame = 0;
 
 private:
     void initWindow()
@@ -134,9 +136,12 @@ private:
 
     void cleanup()
     {
-        vkDestroyFence(device, inFlightFence, nullptr);
-        vkDestroySemaphore(device, imageAvailableSemaphore, nullptr);
-        vkDestroySemaphore(device, renderFinishSemaphore, nullptr);
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+        {
+            vkDestroyFence(device, inFlightFences[i], nullptr);
+            vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
+            vkDestroySemaphore(device, renderFinishSemaphores[i], nullptr);
+        }
         vkDestroyCommandPool(device, commandPool, nullptr);
         for (VkFramebuffer framebuffer : swapChainFramebuffers)
         {
@@ -608,14 +613,15 @@ private:
 
     void createCommandBuffer()
     {
+        commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
         VkCommandBufferAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
         allocInfo.commandPool = commandPool;
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        allocInfo.commandBufferCount = 1; // only create one buffer
-        if (vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer) != VK_SUCCESS)
+        allocInfo.commandBufferCount = static_cast<uint32_t>(commandBuffers.size());
+        if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS)
         {
-            throw std::runtime_error("failed to allocate the command buffer!");
+            throw std::runtime_error("failed to allocate the command buffers!");
         }
     }
 
@@ -670,42 +676,48 @@ private:
 
     void createSyncObjects()
     {
+        imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+        renderFinishSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+        inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
         VkSemaphoreCreateInfo semaphoreInfo{};
         semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
         VkFenceCreateInfo fenceInfo{};
         fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
         fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-        if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphore) != VK_SUCCESS
-            || vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishSemaphore) != VK_SUCCESS
-            || vkCreateFence(device, &fenceInfo, nullptr, &inFlightFence))
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
-            throw std::runtime_error("failed to create semaphore and fence!");
+            if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS
+                || vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishSemaphores[i]) != VK_SUCCESS
+                || vkCreateFence(device, &fenceInfo, nullptr, &inFlightFences[i]))
+            {
+                throw std::runtime_error("failed to create semaphores and fences!");
+            }
         }
     }
 
     void drawFrame()
     {
-        vkWaitForFences(device, 1, &inFlightFence, VK_TRUE, UINT64_MAX);
-        vkResetFences(device, 1, &inFlightFence);
+        vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
+        vkResetFences(device, 1, &inFlightFences[currentFrame]);
 
         uint32_t imageIndex;
-        vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
-        vkResetCommandBuffer(commandBuffer, 0);
-        recordCommandBuffer(commandBuffer, imageIndex);
+        vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+        vkResetCommandBuffer(commandBuffers[currentFrame], 0);
+        recordCommandBuffer(commandBuffers[currentFrame], imageIndex);
 
         VkSubmitInfo submitInfo{};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        VkSemaphore waitSemaphores[] = { imageAvailableSemaphore };
+        VkSemaphore waitSemaphores[] = { imageAvailableSemaphores[currentFrame] };
         VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
         submitInfo.waitSemaphoreCount = 1;
         submitInfo.pWaitSemaphores = waitSemaphores;
         submitInfo.pWaitDstStageMask = waitStages;
         submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = &commandBuffer;
-        VkSemaphore signalSemaphores[] = { renderFinishSemaphore };
+        submitInfo.pCommandBuffers = &commandBuffers[currentFrame];
+        VkSemaphore signalSemaphores[] = { renderFinishSemaphores[currentFrame] };
         submitInfo.signalSemaphoreCount = 1;
         submitInfo.pSignalSemaphores = signalSemaphores;
-        if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFence) != VK_SUCCESS)
+        if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS)
         {
             throw std::runtime_error("failed to submit queue!");
         }
@@ -719,6 +731,8 @@ private:
         presentInfo.pImageIndices = &imageIndex;
         presentInfo.pResults = nullptr; // Optional
         vkQueuePresentKHR(graphicsQueue, &presentInfo);
+
+        currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
     }
 
     VkShaderModule createShaderModule(const std::vector<char>& code)
