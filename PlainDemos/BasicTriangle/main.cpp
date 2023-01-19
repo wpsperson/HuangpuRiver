@@ -613,7 +613,7 @@ private:
         viewport.y = 0;
         viewport.width = static_cast<float>(swapChainExtent.width);
         viewport.height = static_cast<float>(swapChainExtent.height);
-        viewport.minDepth = 1.0f;
+        viewport.minDepth = 0.0f;
         viewport.maxDepth = 1.0f;
 
         VkRect2D scissor{};
@@ -1189,7 +1189,7 @@ private:
         viewport.y = 0;
         viewport.width = static_cast<float>(swapChainExtent.width);
         viewport.height = static_cast<float>(swapChainExtent.height);
-        viewport.minDepth = 1.0f;
+        viewport.minDepth = 0.0f;
         viewport.maxDepth = 1.0f;
         vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
 
