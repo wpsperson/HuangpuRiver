@@ -4,6 +4,7 @@ INCLUDE_DIRECTORIES(${DemoPath})
 INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/ThirdParty/glm-0.9.9.8)
 INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/ThirdParty/glfw-3.2.1/include)
 INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/ThirdParty/stb/include)
+INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/ThirdParty/tinyobjloader/include)
 INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/ThirdParty/vulkan-1.3/include)
 LINK_DIRECTORIES(${PROJECT_SOURCE_DIR}/ThirdParty/glfw-3.2.1/lib)
 LINK_DIRECTORIES(${PROJECT_SOURCE_DIR}/ThirdParty/vulkan-1.3/lib)
@@ -34,3 +35,13 @@ glfw3.lib
 )
 TARGET_LINK_LIBRARIES(${TARGET_NAME} debug "${ADDITIONAL_LIBRARIES_DEBUG}" optimized "${ADDITIONAL_LIBRARIES_RELEASE}")
 
+
+add_custom_command(TARGET ${TARGET_NAME} POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory  
+                ${PROJECT_SOURCE_DIR}/shaders 
+                ${CMAKE_BINARY_DIR}/bin/shaders)
+add_custom_command(TARGET ${TARGET_NAME} POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory  
+                ${PROJECT_SOURCE_DIR}/textures 
+                ${CMAKE_BINARY_DIR}/bin/textures)
+add_custom_command(TARGET ${TARGET_NAME} POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory  
+                ${PROJECT_SOURCE_DIR}/models 
+                ${CMAKE_BINARY_DIR}/bin/models)
